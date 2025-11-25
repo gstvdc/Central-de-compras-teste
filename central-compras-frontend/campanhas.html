@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Campanhas — Central de Compras</title>
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">Central de Compras</div>
+    <nav>
+      <a href="dashboard.html">Dashboard</a>
+      <a href="fornecedores.html">Fornecedores</a>
+      <a href="campanhas.html">Campanhas</a>
+      <a href="cashback.html">Cashback</a>
+      <a href="index.html">Sair</a>
+    </nav>
+  </header>
+
+  <main class="container">
+    <h1>Campanhas em destaque</h1>
+    <section id="banners" class="grid-3"></section>
+
+    <section class="card full">
+      <h2>Detalhes de campanha</h2>
+      <div id="campaignDetails" class="muted">Clique em um banner para ver detalhes.</div>
+    </section>
+  </main>
+
+  <script src="js/data.js"></script>
+  <script src="js/app.js"></script>
+  <script>
+    const banners = document.getElementById('banners');
+    function renderBanners(){
+      const c = db.getCampaigns();
+      banners.innerHTML = '';
+      c.forEach(cam=>{
+        const card = document.createElement('div');
+        card.className='card banner';
+        card.innerHTML = `<h3>${cam.title}</h3><p class="small">${cam.subtitle}</p><button class="btn small" onclick='openCampaign("${cam.id}")'>Ver campanha</button>`;
+        banners.appendChild(card);
+      });
+    }
+    function openCampaign(id){
+      const cam = db.getCampaign(id);
+      document.getElementById('campaignDetails').innerHTML = `
+        <h3>${cam.title}</h3>
+        <p>${cam.description}</p>
+        <p><b>Período:</b> ${cam.start} → ${cam.end}</p>
+        <p><b>Regras:</b> ${cam.rules}</p>
+        <div class="row"><button class="btn" onclick="location.href='fornecedores.html'">Ver fornecedores</button></div>
+      `;
+    }
+    renderBanners();
+  </script>
+</body>
+</html>

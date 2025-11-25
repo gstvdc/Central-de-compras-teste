@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Dashboard — Lojista</title>
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">Central de Compras</div>
+    <nav>
+      <a href="dashboard.html">Dashboard</a>
+      <a href="fornecedores.html">Fornecedores</a>
+      <a href="campanhas.html">Campanhas</a>
+      <a href="cashback.html">Cashback</a>
+      <a href="#" id="logout">Sair</a>
+    </nav>
+  </header>
+
+  <main class="container">
+    <section class="grid-3" id="overview">
+      <!-- cartões preenchidos por JS -->
+    </section>
+
+    <section class="card full">
+      <h2>Últimos Pedidos</h2>
+      <table id="ordersTable" class="table">
+        <thead><tr><th>#</th><th>Fornecedor</th><th>Total</th><th>Status</th><th>Ações</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </section>
+  </main>
+
+  <script src="js/data.js"></script>
+  <script src="js/app.js"></script>
+  <script>
+    appAuth.requireLogin();
+
+    // render overview
+    const overview = document.getElementById('overview');
+    function renderOverview() {
+      const orders = db.getOrders();
+      const totalPedidos = orders.length;
+      const totalValor = orders.reduce((s,o)=>s+o.total,0).toFixed(2);
+      const cashback = db.getCashback();
+      overview.innerHTML = `
+        <div class="card small"><h3>Pedidos</h3><p class="big">${totalPedidos}</p></div>
+        <div class="card small"><h3>Valor em pedidos</h3><p class="big">R$ ${totalValor}</p></div>
+        <div class="card small"><h3>Cashback</h3><p class="big">R$ ${cashback.toFixed(2)}</p></div>
+      `;
+    }
+
+    // render orders table
+    function renderOrders() {
+      const tbody = document.querySelector('#ordersTable tbody');
+      const orders = db.getOrders().slice().reverse();
+      tbody.innerHTML = '';
+      orders.forEach((o,idx)=>{
+        const tr = document.createElement('tr');
+        tr.innerHTML = `<td>${o.id}</td>
+          <td>${o.fornecedorName}</td>
+          <td>R$ ${o.total.toFixed(2)}</td>
+          <td>${o.status}</td>
+          <td>
+            <button class="btn small" onclick="viewOrder('${o.id}')">Ver</button>
+            <button class="btn alt small" onclick="downloadOrder('${o.id}')">Baixar</button>
+          </td>`;
+        tbody.appendChild(tr);
+      });
+    }
+
+    window.viewOrder = function(id){
+      const order = db.getOrders().find(x=>x.id===id);
+      alert('Pedido '+id+'\nFornecedor: '+order.fornecedorName+'\nTotal: R$ '+order.total.toFixed(2)+'\nItens: '+order.items.length);
+    }
+
+    window.downloadOrder = function(id){
+      const order = db.getOrders().find(x=>x.id===id);
+      const txt = JSON.stringify(order, null, 2);
+      const blob = new Blob([txt], {type:'application/json'});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = `pedido-${id}.json`; a.click();
+      URL.revokeObjectURL(url);
+    }
+
+    document.getElementById('logout').addEventListener('click', (e)=>{ e.preventDefault(); appAuth.logout(); location.href='index.html'; });
+
+    // init
+    renderOverview();
+    renderOrders();
+  </script>
+</body>
+</html>

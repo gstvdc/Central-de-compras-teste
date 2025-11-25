@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Admin — Campanhas</title>
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">Central de Compras — Admin</div>
+    <nav>
+      <a href="admin.html">Painel</a>
+      <a href="admin-fornecedores.html">Fornecedores</a>
+      <a href="admin-campanhas.html">Campanhas</a>
+      <a href="index.html">Sair</a>
+    </nav>
+  </header>
+
+  <main class="container">
+    <h1>Campanhas</h1>
+
+    <section class="card">
+      <h3>Nova Campanha</h3>
+      <form id="campForm">
+        <label>Título</label><input id="campTitle" required />
+        <label>Subtítulo</label><input id="campSubtitle" />
+        <label>Descrição</label><textarea id="campDesc"></textarea>
+        <label>Período (start)</label><input id="campStart" type="date" />
+        <label>Período (end)</label><input id="campEnd" type="date" />
+        <label>Regras</label><input id="campRules" />
+        <label>Fornecedores (Ctrl+clique para selecionar múltiplos)</label>
+        <select id="campFornecedores" multiple size="4"></select>
+
+        <div class="row between">
+          <button class="btn alt" type="reset">Limpar</button>
+          <button class="btn primary" type="submit">Criar Campanha</button>
+        </div>
+      </form>
+    </section>
+
+    <section class="card full">
+      <h2>Campanhas Existentes</h2>
+      <div id="campList"></div>
+    </section>
+  </main>
+
+  <script src="js/data.js"></script>
+  <script src="js/app.js"></script>
+  <script>
+    appAuth.requireAdmin();
+    const campForm = document.getElementById('campForm');
+    const campFornecedores = document.getElementById('campFornecedores');
+    const campList = document.getElementById('campList');
+
+    function initCampForm(){
+      campFornecedores.innerHTML = '';
+      db.getFornecedores().forEach(f=>{
+        const opt = document.createElement('option');
+        opt.value = f.id; opt.textContent = f.name + ' ('+f.state+')';
+        campFornecedores.appendChild(opt);
+      });
+    }
+
+    campForm.addEventListener('submit', (e)=>{
+      e.preventDefault();
+      const selected = Array.from(campFornecedores.selectedOptions).map(o=>o.value);
+      const obj = {
+        title: document.getElementById('campTitle').value.trim(),
+        subtitle: document.getElementById('campSubtitle').value.trim(),
+        description: document.getElementById('campDesc').value.trim(),
+        start: document.getElementById('campStart').value,
+        end: document.getElementById('campEnd').value,
+        rules: document.getElementById('campRules').value.trim(),
+        fornecedorIds: selected
+      };
+      db.addCampaign(obj);
+      campForm.reset();
+      renderCampaigns();
+      alert('Campanha criada.');
+    });
+
+    function renderCampaigns(){
+      const c = db.getCampaigns();
+      campList.innerHTML = '';
+      c.forEach(cam=>{
+        const div = document.createElement('div');
+        div.className='card';
+        const names = (cam.fornecedorIds || []).map(id=> (db.getFornecedor(id)||{}).name || '—').join(', ');
+        div.innerHTML = `<h3>${cam.title} <small class="muted">${cam.start} → ${cam.end}</small></h3>
+          <p>${cam.description}</p>
+          <p class="small muted">Fornecedores: ${names}</p>
+          <div class="row">
+            <button class="btn" onclick='editCamp("${cam.id}")'>Editar</button>
+            <button class="btn alt" onclick='removeCamp("${cam.id}")'>Remover</button>
+          </div>`;
+        campList.appendChild(div);
+      });
+    }
+
+    function editCamp(id){
+      const cam = db.getCampaign(id);
+      const html = `<h3>Editar Campanha</h3>
+        <label>Título</label><input id="editCampTitle" value="${cam.title}" />
+        <label>Subtítulo</label><input id="editCampSubtitle" value="${cam.subtitle}" />
+        <label>Descrição</label><textarea id="editCampDesc">${cam.description}</textarea>
+        <label>Start</label><input id="editCampStart" type="date" value="${cam.start}" />
+        <label>End</label><input id="editCampEnd" type="date" value="${cam.end}" />
+        <label>Regras</label><input id="editCampRules" value="${cam.rules||''}" />
+        <label>Fornecedores</label><select id="editCampForns" multiple size="4"></select>
+        <div class="row between"><button class="btn" onclick='saveCamp("${id}")'>Salvar</button><button class="btn alt" onclick="location.reload()">Cancelar</button></div>`;
+      // reuse modal for editing
+      const modal = document.createElement('div');
+      modal.className='modal'; modal.style.display='flex';
+      modal.innerHTML = `<div class="modal-card">${html}<button class="close" onclick="document.body.removeChild(this.parentNode.parentNode)">✕</button></div>`;
+      document.body.appendChild(modal);
+      const sel = modal.querySelector('#editCampForns');
+      db.getFornecedores().forEach(f=>{
+        const o = document.createElement('option'); o.value=f.id; o.textContent=f.name;
+        if(cam.fornecedorIds && cam.fornecedorIds.includes(f.id)) o.selected=true;
+        sel.appendChild(o);
+      });
+    }
+
+    function saveCamp(id){
+      // modal is last appended .modal
+      const modal = document.querySelectorAll('.modal');
+      const m = modal[modal.length-1];
+      const title = m.querySelector('#editCampTitle').value.trim();
+      const subtitle = m.querySelector('#editCampSubtitle').value.trim();
+      const desc = m.querySelector('#editCampDesc').value.trim();
+      const start = m.querySelector('#editCampStart').value;
+      const end = m.querySelector('#editCampEnd').value;
+      const rules = m.querySelector('#editCampRules').value.trim();
+      const fornecedores = Array.from(m.querySelector('#editCampForns').selectedOptions).map(o=>o.value);
+      db.updateCampaign(id, { title, subtitle, description: desc, start, end, rules, fornecedorIds: fornecedores });
+      document.body.removeChild(m);
+      renderCampaigns();
+      alert('Campanha salva.');
+    }
+
+    function removeCamp(id){
+      if(!confirm('Remover campanha?')) return;
+      db.removeCampaign(id);
+      renderCampaigns();
+    }
+
+    initCampForm();
+    renderCampaigns();
+  </script>
+</body>
+</html>

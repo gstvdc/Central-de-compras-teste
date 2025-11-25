@@ -1,0 +1,179 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Admin — Fornecedores</title>
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">Central de Compras — Admin</div>
+    <nav>
+      <a href="admin.html">Painel</a>
+      <a href="admin-fornecedores.html">Fornecedores</a>
+      <a href="admin-campanhas.html">Campanhas</a>
+      <a href="index.html">Sair</a>
+    </nav>
+  </header>
+
+  <main class="container">
+    <h1>Fornecedores</h1>
+
+    <section class="card">
+      <h3>Novo Fornecedor</h3>
+      <form id="fornForm">
+        <label>Nome</label><input id="fornName" required />
+        <label>Cidade</label><input id="fornCity" />
+        <label>Estado (UF)</label><input id="fornState" />
+        <label>Telefone</label><input id="fornPhone" />
+        <label>Representante</label><input id="fornRep" />
+        <label>Descrição</label><textarea id="fornDesc"></textarea>
+        <div class="row between">
+          <button class="btn alt" type="reset">Limpar</button>
+          <button class="btn primary" type="submit">Adicionar Fornecedor</button>
+        </div>
+      </form>
+    </section>
+
+    <section class="card full">
+      <h2>Lista de Fornecedores</h2>
+      <div id="fornList"></div>
+    </section>
+  </main>
+
+  <div id="fornModal" class="modal" aria-hidden="true">
+    <div class="modal-card">
+      <button class="close" onclick="closeFornModal()">✕</button>
+      <div id="fornModalContent"></div>
+    </div>
+  </div>
+
+  <script src="js/data.js"></script>
+  <script src="js/app.js"></script>
+  <script>
+    appAuth.requireAdmin();
+
+    const fornForm = document.getElementById('fornForm');
+    const fornList = document.getElementById('fornList');
+    let editingFornecedorId = null;
+
+    function renderFornecedoresAdmin(){
+      const fs = db.getFornecedores();
+      fornList.innerHTML = '';
+      fs.forEach(f=>{
+        const div = document.createElement('div');
+        div.className='card';
+        div.innerHTML = `
+          <h3>${f.name} <small class="muted">${f.city} - ${f.state}</small></h3>
+          <p>${f.description}</p>
+          <div class="row">
+            <button class="btn" onclick='openForn("${f.id}")'>Abrir</button>
+            <button class="btn alt" onclick='openEditForn("${f.id}")'>Editar</button>
+            <button class="btn" onclick='removeForn("${f.id}")'>Remover</button>
+          </div>
+        `;
+        fornList.appendChild(div);
+      });
+    }
+
+    fornForm.addEventListener('submit', (e)=>{
+      e.preventDefault();
+      const obj = {
+        name: document.getElementById('fornName').value.trim(),
+        city: document.getElementById('fornCity').value.trim(),
+        state: document.getElementById('fornState').value.trim(),
+        phone: document.getElementById('fornPhone').value.trim(),
+        representative: document.getElementById('fornRep').value.trim(),
+        description: document.getElementById('fornDesc').value.trim()
+      };
+      db.addFornecedor(obj);
+      fornForm.reset();
+      renderFornecedoresAdmin();
+      alert('Fornecedor adicionado.');
+    });
+
+    function openForn(id){
+      const f = db.getFornecedor(id);
+      const html = `<h3>${f.name}</h3><p>${f.description}</p><h4>Produtos</h4><div id="prodArea"></div>
+        <h4>Adicionar produto</h4>
+        <label>Nome</label><input id="newProdName" />
+        <label>Preço</label><input id="newProdPrice" type="number" step="0.01" />
+        <label>Descrição</label><input id="newProdDesc" />
+        <div class="row"><button class="btn" onclick="addProductTo('${f.id}')">Adicionar produto</button><button class="btn alt" onclick="closeFornModal()">Fechar</button></div>`;
+      document.getElementById('fornModalContent').innerHTML = html;
+      renderProdArea(f);
+      showFornModal();
+    }
+
+    function renderProdArea(f){
+      const area = document.getElementById('prodArea');
+      area.innerHTML = '';
+      f.products.forEach(p=>{
+        const div = document.createElement('div');
+        div.className = 'product-row';
+        div.innerHTML = `<div><strong>${p.name}</strong><div class="muted small">${p.desc||''}</div></div><div>R$ ${p.price.toFixed(2)} <button class="btn alt small" onclick='removeProduct("${f.id}","${p.id}")'>Remover</button></div>`;
+        area.appendChild(div);
+      });
+    }
+
+    function addProductTo(fornecedorId){
+      const name = document.getElementById('newProdName').value.trim();
+      const price = parseFloat(document.getElementById('newProdPrice').value || 0);
+      const desc = document.getElementById('newProdDesc').value.trim();
+      if(!name || !price){ alert('Nome e preço são obrigatórios'); return; }
+      db.addProduct(fornecedorId, { name, price, desc });
+      openForn(fornecedorId);
+    }
+
+    function removeProduct(fornecedorId, prodId){
+      if(!confirm('Remover produto?')) return;
+      db.removeProduct(fornecedorId, prodId);
+      openForn(fornecedorId);
+    }
+
+    function openEditForn(id){
+      const f = db.getFornecedor(id);
+      editingFornecedorId = id;
+      const html = `
+        <h3>Editar Fornecedor</h3>
+        <label>Nome</label><input id="editName" value="${f.name}" />
+        <label>Cidade</label><input id="editCity" value="${f.city}" />
+        <label>Estado</label><input id="editState" value="${f.state}" />
+        <label>Telefone</label><input id="editPhone" value="${f.phone}" />
+        <label>Representante</label><input id="editRep" value="${f.representative}" />
+        <label>Descrição</label><textarea id="editDesc">${f.description}</textarea>
+        <div class="row between"><button class="btn" onclick="saveEditForn()">Salvar</button><button class="btn alt" onclick="closeFornModal()">Cancelar</button></div>
+      `;
+      document.getElementById('fornModalContent').innerHTML = html;
+      showFornModal();
+    }
+
+    function saveEditForn(){
+      const patch = {
+        name: document.getElementById('editName').value.trim(),
+        city: document.getElementById('editCity').value.trim(),
+        state: document.getElementById('editState').value.trim(),
+        phone: document.getElementById('editPhone').value.trim(),
+        representative: document.getElementById('editRep').value.trim(),
+        description: document.getElementById('editDesc').value.trim()
+      };
+      db.updateFornecedor(editingFornecedorId, patch);
+      closeFornModal();
+      renderFornecedoresAdmin();
+      alert('Fornecedor atualizado.');
+    }
+
+    function removeForn(id){
+      if(!confirm('Remover fornecedor e todos os produtos?')) return;
+      db.removeFornecedor(id);
+      renderFornecedoresAdmin();
+    }
+
+    function showFornModal(){ document.getElementById('fornModal').style.display='flex'; }
+    function closeFornModal(){ document.getElementById('fornModal').style.display='none'; }
+
+    renderFornecedoresAdmin();
+  </script>
+</body>
+</html>
